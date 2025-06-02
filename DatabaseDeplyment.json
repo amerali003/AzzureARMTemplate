@@ -1,0 +1,167 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "sqlServerName": {
+            "type": "string",
+            "defaultValue": "ehr-server",
+            "metadata": {
+                "description": "The name of the SQL Server to create."
+            }
+        },
+        "sqlAdminUsername": {
+            "type": "string",
+            "metadata": {
+                "description": "The administrator username of the SQL Server."
+            }
+        },
+        "sqlAdminPassword": {
+            "type": "securestring",
+            "metadata": {
+                "description": "The administrator password of the SQL Server."
+            }
+        },
+        "databaseName": {
+            "type": "string",
+            "defaultValue": "ehr-database",
+            "metadata": {
+                "description": "The name of the database to create."
+            }
+        },
+        "location": {
+            "type": "string",
+            "defaultValue": "[resourceGroup().location]",
+            "metadata": {
+                "description": "Location for all resources."
+            }
+        },
+        "skuName": {
+            "type": "string",
+            "defaultValue": "Basic",
+            "metadata": {
+                "description": "The SKU name for the database (e.g., Basic, Standard, Premium)."
+            }
+        }
+    },
+    "resources": [
+        {
+            "type": "Microsoft.Sql/servers",
+            "apiVersion": "2021-11-01",
+            "name": "[parameters('sqlServerName')]",
+            "location": "[parameters('location')]",
+            "properties": {
+                "administratorLogin": "[parameters('sqlAdminUsername')]",
+                "administratorLoginPassword": "[parameters('sqlAdminPassword')]",
+                "version": "12.0"
+            },
+            "resources": [
+                {
+                    "type": "firewallRules",
+                    "apiVersion": "2021-11-01",
+                    "name": "AllowAllAzureIPs",
+                    "location": "[parameters('location')]",
+                    "properties": {
+                        "startIpAddress": "0.0.0.0",
+                        "endIpAddress": "0.0.0.0"
+                    },
+                    "dependsOn": [
+                        "[resourceId('Microsoft.Sql/servers', parameters('sqlServerName'))]"
+                    ]
+                }
+            ]
+        },
+        {
+            "type": "Microsoft.Sql/servers/databases",
+            "apiVersion": "2021-11-01",
+            "name": "[concat(parameters('sqlServerName'), '/', parameters('databaseName'))]",
+            "location": "[parameters('location')]",
+            "sku": {
+                "name": "[parameters('skuName')]",
+                "tier": "[parameters('skuName')]"
+            },
+            "dependsOn": [
+                "[resourceId('Microsoft.Sql/servers', parameters('sqlServerName'))]"
+            ]
+        },
+        {
+            "type": "Microsoft.Resources/deploymentScripts",
+            "apiVersion": "2020-10-01",
+            "name": "createTables",
+            "location": "[parameters('location')]",
+            "kind": "AzurePowerShell",
+            "dependsOn": [
+                "[resourceId('Microsoft.Sql/servers/databases', parameters('sqlServerName'), parameters('databaseName'))]"
+            ],
+            "properties": {
+                "azPowerShellVersion": "8.3",
+                "scriptContent": "
+$serverName = $Env:sqlServerName;
+$databaseName = $Env:databaseName;
+$adminUsername = $Env:sqlAdminUsername;
+$adminPassword = $Env:sqlAdminPassword;
+
+$connectionString = \"Server=tcp:$serverName.database.windows.net,1433;Initial Catalog=$databaseName;Persist Security Info=False;User ID=$adminUsername;Password=$adminPassword;MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=False;Connection Timeout=30;\";
+
+$sqlCommand = @\"
+CREATE TABLE dbo.doctor (
+    id INT PRIMARY KEY NOT NULL,
+    doctor_name VARCHAR(255),
+    emergency_phone VARCHAR(50),
+    main_major_name VARCHAR(255),
+    sub_major_name VARCHAR(255),
+    age INT NOT NULL,
+    gender VARCHAR(50)
+);
+
+CREATE TABLE dbo.patient (
+    id INT PRIMARY KEY NOT NULL,
+    address VARCHAR(255),
+    age INT NOT NULL,
+    email VARCHAR(255),
+    gender VARCHAR(50),
+    name VARCHAR(255),
+    phone VARCHAR(50)
+);
+
+CREATE TABLE dbo.appointment (
+    id INT PRIMARY KEY NOT NULL,
+    appointment_date VARCHAR(50),
+    appointment_time VARCHAR(50),
+    doctor_name VARCHAR(255),
+    location VARCHAR(255),
+    patient_id VARCHAR(50),
+    doctor_id INT,
+    FOREIGN KEY (doctor_id) REFERENCES dbo.doctor(id)
+);
+\"@
+
+$connection = New-Object System.Data.SqlClient.SqlConnection($connectionString);
+$connection.Open();
+$command = New-Object System.Data.SqlClient.SqlCommand($sqlCommand, $connection);
+$command.ExecuteNonQuery();
+$connection.Close();
+",
+                "environmentVariables": [
+                    {
+                        "name": "sqlServerName",
+                        "value": "[parameters('sqlServerName')]"
+                    },
+                    {
+                        "name": "databaseName",
+                        "value": "[parameters('databaseName')]"
+                    },
+                    {
+                        "name": "sqlAdminUsername",
+                        "value": "[parameters('sqlAdminUsername')]"
+                    },
+                    {
+                        "name": "sqlAdminPassword",
+                        "value": "[parameters('sqlAdminPassword')]"
+                    }
+                ],
+                "cleanupPreference": "OnSuccess",
+                "retentionInterval": "P1D"
+            }
+        }
+    ]
+}

@@ -1,0 +1,89 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "siteName": {
+            "type": "string",
+            "defaultValue": "TheHospitalFrontEnd",
+            "metadata": {
+                "description": "The name of the static web app."
+            }
+        },
+        "location": {
+            "type": "string",
+            "defaultValue": "eastus2",
+            "metadata": {
+                "description": "Location for the static web app (must be a supported region)."
+            }
+        },
+        "sku": {
+            "type": "string",
+            "defaultValue": "Free",
+            "metadata": {
+                "description": "The SKU of the static web app."
+            }
+        },
+        "repositoryUrl": {
+            "type": "string",
+            "defaultValue": "https://github.com/amerali003/TheHospitalFrontEnd.git",
+            "metadata": {
+                "description": "The URL of the GitHub repository."
+            }
+        },
+        "branch": {
+            "type": "string",
+            "defaultValue": "main",
+            "metadata": {
+                "description": "The branch of the GitHub repository."
+            }
+        },
+        "appLocation": {
+            "type": "string",
+            "defaultValue": "/",
+            "metadata": {
+                "description": "The location of the app in the repository."
+            }
+        },
+        "apiLocation": {
+            "type": "string",
+            "defaultValue": "",
+            "metadata": {
+                "description": "The location of the API in the repository."
+            }
+        },
+        "appArtifactLocation": {
+            "type": "string",
+            "defaultValue": "build",
+            "metadata": {
+                "description": "The location of the build output."
+            }
+        }
+    },
+    "resources": [
+        {
+            "type": "Microsoft.Web/staticSites",
+            "apiVersion": "2021-01-15",
+            "name": "[parameters('siteName')]",
+            "location": "[parameters('location')]",
+            "sku": {
+                "name": "[parameters('sku')]",
+                "tier": "[parameters('sku')]"
+            },
+            "properties": {
+                "repositoryUrl": "[parameters('repositoryUrl')]",
+                "branch": "[parameters('branch')]",
+                "buildProperties": {
+                    "appLocation": "[parameters('appLocation')]",
+                    "apiLocation": "[parameters('apiLocation')]",
+                    "appArtifactLocation": "[parameters('appArtifactLocation')]"
+                }
+            }
+        }
+    ],
+    "outputs": {
+        "staticWebAppUrl": {
+            "type": "string",
+            "value": "[concat(parameters('siteName'), '.azurestaticapps.net')]"
+        }
+    }
+}

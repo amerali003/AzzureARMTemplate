@@ -1,0 +1,92 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "githubToken": {
+            "type": "securestring",
+            "metadata": {
+                "description": "GitHub PAT with repo and workflow permissions"
+            }
+        }
+    },
+    "variables": {
+        "webAppName": "TheBackEndApp002",
+        "appServicePlanName": "[concat('ASP-', variables('webAppName'))]",
+        "repoUrl": "https://github.com/amerali003/TheHospitalBackEnd.git",
+        "branch": "main",
+        "location": "centralus",
+        "sku": "F1",
+        "javaVersion": "8"
+    },
+    "resources": [
+        {
+            "type": "Microsoft.Web/serverfarms",
+            "apiVersion": "2022-03-01",
+            "name": "[variables('appServicePlanName')]",
+            "location": "[variables('location')]",
+            "sku": {
+                "name": "[variables('sku')]",
+                "tier": "Free",
+                "size": "F1",
+                "family": "F",
+                "capacity": 1
+            },
+            "kind": "linux",
+            "properties": {
+                "reserved": true
+            }
+        },
+        {
+            "type": "Microsoft.Web/sites",
+            "apiVersion": "2022-03-01",
+            "name": "[variables('webAppName')]",
+            "location": "[variables('location')]",
+            "kind": "app,linux",
+            "dependsOn": [
+                "[resourceId('Microsoft.Web/serverfarms', variables('appServicePlanName'))]"
+            ],
+            "properties": {
+                "serverFarmId": "[resourceId('Microsoft.Web/serverfarms', variables('appServicePlanName'))]",
+                "siteConfig": {
+                    "linuxFxVersion": "JAVA|8",
+                    "appSettings": [
+                        {
+                            "name": "WEBSITE_RUN_FROM_PACKAGE",
+                            "value": "1"
+                        }
+                    ]
+                }
+            },
+            "resources": [
+                {
+                    "type": "sourcecontrols",
+                    "apiVersion": "2022-03-01",
+                    "name": "web",
+                    "dependsOn": [
+                        "[resourceId('Microsoft.Web/sites', variables('webAppName'))]"
+                    ],
+                    "properties": {
+                        "repoUrl": "[variables('repoUrl')]",
+                        "branch": "[variables('branch')]",
+                        "isManualIntegration": false,
+                        "deploymentRollbackEnabled": true,
+                        "isMercurial": false,
+                        "githubActionConfiguration": {
+                            "codeConfiguration": {
+                                "runtimeStack": "java",
+                                "runtimeVersion": "[variables('javaVersion')]"
+                            },
+                            "generateWorkflowFile": true
+                        }
+                    }
+                }
+            ]
+        }
+    ],
+    "outputs": {
+        "appUrl": {
+            "type": "string",
+            "value": "[concat('https://', variables('webAppName'), '.azurewebsites.net')]"
+        }
+    }
+}
